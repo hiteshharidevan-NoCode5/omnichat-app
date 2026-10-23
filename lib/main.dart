@@ -286,7 +286,7 @@ class _ActiveChatScreenState extends State<ActiveChatScreen> {
     final text = _msgController.text.trim();
     if (text.isNotEmpty) {
       _msgController.clear();
-      await widget.room.sendTextMessage(text);
+      await widget.room.sendTextEvent(text);
       if (mounted) setState(() {});
     }
   }
