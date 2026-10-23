@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#111B21"/>
+  <path d="M 130 110 C 130 90, 382 90, 382 110 L 382 155 C 382 175, 362 175, 362 175 L 362 195 L 332 175 L 180 175 L 150 195 L 150 175 C 130 175, 130 155, 130 155 Z" fill="none" stroke="#26A69A" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 190 62 Q 256 46 322 62" fill="none" stroke="#80CBC4" stroke-width="10" stroke-linecap="round"/>
+  <polyline points="204,50 188,62 204,74" fill="none" stroke="#80CBC4" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="110" y="270" width="110" height="74" rx="28" fill="none" stroke="#26A69A" stroke-width="14"/>
+  <path d="M 190 344 L 204 366 L 206 344" fill="none" stroke="#26A69A" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="292" y="270" width="110" height="74" rx="28" fill="none" stroke="#26A69A" stroke-width="14"/>
+  <path d="M 322 344 L 308 366 L 306 344" fill="none" stroke="#26A69A" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 165 240 L 165 210" fill="none" stroke="#4DB6AC" stroke-width="10" stroke-linecap="round"/>
+  <polyline points="155,224 165,210 175,224" fill="none" stroke="#4DB6AC" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 347 210 L 347 240" fill="none" stroke="#4DB6AC" stroke-width="10" stroke-linecap="round"/>
+  <polyline points="337,226 347,240 357,226" fill="none" stroke="#4DB6AC" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 175 400 Q 256 460 337 400" fill="none" stroke="#4DB6AC" stroke-width="12" stroke-linecap="round"/>
+  <polyline points="325,390 341,402 329,416" fill="none" stroke="#4DB6AC" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 337 425 Q 256 480 175 425" fill="none" stroke="#80CBC4" stroke-width="10" stroke-linecap="round"/>
+  <polyline points="187,437 171,423 183,411" fill="none" stroke="#80CBC4" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
