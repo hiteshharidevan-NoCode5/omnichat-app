@@ -25,9 +25,9 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Bootstrap Minimal Flutter Project if Empty
+      - name: Ensure Android Scaffolding Exists
         run: |
-          if [ ! -f "pubspec.yaml" ]; then
+          if [ ! -d "android" ]; then
             flutter create --org com.omnichat --project-name omnichat .
           fi
 
