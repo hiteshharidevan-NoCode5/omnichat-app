@@ -1,130 +1,256 @@
 import 'package:flutter/material.dart';
+import 'package:matrix/matrix.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 
-void main() {
-  runApp(const OmniChatApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final client = Client(
+    'OmniChatUniversal',
+    databaseBuilder: (_) async {
+      final dir = await getApplicationSupportDirectory();
+      final db = HiveCollectionsDatabase('omnichat_db', dir.path);
+      await db.open();
+      return db;
+    },
+  );
+
+  await client.init();
+  runApp(OmniChatApp(client: client));
 }
 
 class OmniChatApp extends StatelessWidget {
-  const OmniChatApp({super.key});
+  final Client client;
+  const OmniChatApp({super.key, required this.client});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OmniChat',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0F766E),
-          brightness: Brightness.dark,
+    return Provider<Client>(
+      create: (_) => client,
+      child: MaterialApp(
+        title: 'OmniChat Universal',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF0F766E),
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
         ),
-        useMaterial3: true,
+        home: client.isLogged()
+            ? const RoomListScreen()
+            : const LoginScreen(),
       ),
-      home: const ChatListScreen(),
     );
   }
 }
 
-class ChatItem {
-  final String name;
-  final String lastMessage;
-  final String time;
-  final String platform;
-  final IconData icon;
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
-  const ChatItem({
-    required this.name,
-    required this.lastMessage,
-    required this.time,
-    required this.platform,
-    required this.icon,
-  });
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class ChatListScreen extends StatelessWidget {
-  const ChatListScreen({super.key});
+class _LoginScreenState extends State<LoginScreen> {
+  final _serverController = TextEditingController(text: 'https://matrix.org');
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _loading = false;
+  String? _error;
 
-  final List<ChatItem> mockChats = const [
-    ChatItem(
-      name: 'Family Group',
-      lastMessage: 'Let us coordinate dinner plans.',
-      time: '12:45 PM',
-      platform: 'WhatsApp Bridge',
-      icon: Icons.chat_bubble_outline,
-    ),
-    ChatItem(
-      name: 'Dev Community',
-      lastMessage: 'Merged the latest pull request.',
-      time: '11:20 AM',
-      platform: 'Telegram Bridge',
-      icon: Icons.send_rounded,
-    ),
-    ChatItem(
-      name: 'Alex Rivera',
-      lastMessage: 'Sent verification payload.',
-      time: 'Yesterday',
-      platform: 'Signal Bridge',
-      icon: Icons.lock_outline,
-    ),
-  ];
+  Future<void> _handleLogin() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final client = Provider.of<Client>(context, listen: false);
+
+    try {
+      await client.checkHomeserver(Uri.parse(_serverController.text.trim()));
+      await client.login(
+        LoginType.mLoginPassword,
+        identifier: AuthenticationUserIdentifier(user: _usernameController.text.trim()),
+        password: _passwordController.text.trim(),
+      );
+
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RoomListScreen()),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('OmniChat — Matrix Connect')),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.hub_outlined, size: 64, color: Colors.tealAccent),
+              const SizedBox(height: 16),
+              const Text(
+                'Connect to Free Matrix Network',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _serverController,
+                decoration: const InputDecoration(
+                  labelText: 'Homeserver URL',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username (without @ or domain)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                  ),
+                ),
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _handleLogin,
+                      child: const Text('Log In / Connect', style: TextStyle(fontSize: 16)),
+                    ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class RoomListScreen extends StatefulWidget {
+  const RoomListScreen({super.key});
+
+  @override
+  State<RoomListScreen> createState() => _RoomListScreenState();
+}
+
+class _RoomListScreenState extends State<RoomListScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final client = Provider.of<Client>(context);
+    final rooms = client.rooms;
+
+    return Scaffold(
       appBar: AppBar(
-        title: const Text('OmniChat Universal'),
-        centerTitle: false,
+        title: const Text('OmniChat Live'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh),
+            onPressed: () => setState(() {}),
           ),
           IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {},
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await client.logout();
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              }
+            },
           ),
         ],
       ),
-      body: ListView.separated(
-        itemCount: mockChats.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
-        itemBuilder: (context, index) {
-          final chat = mockChats[index];
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Icon(chat.icon, color: Theme.of(context).colorScheme.onPrimaryContainer),
-            ),
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(chat.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(chat.time, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 2),
-                Text(chat.lastMessage, maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white10,
-                    borderRadius: BorderRadius.circular(4),
+      body: StreamBuilder(
+        stream: client.onSync.stream,
+        builder: (context, _) {
+          if (rooms.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('No active rooms found.'),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Create New Chat Room'),
+                    onPressed: () async {
+                      final newRoomId = await client.createRoom(
+                        name: 'OmniChat Test Room',
+                      );
+                      setState(() {});
+                      final room = client.getRoomById(newRoomId);
+                      if (room != null && mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => ActiveChatScreen(room: room)),
+                        );
+                      }
+                    },
                   ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.separated(
+            itemCount: rooms.length,
+            separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+            itemBuilder: (context, index) {
+              final room = rooms[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                   child: Text(
-                    chat.platform,
-                    style: const TextStyle(fontSize: 10, color: Colors.tealAccent),
+                    room.name.isNotEmpty ? room.name[0].toUpperCase() : '#',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer),
                   ),
                 ),
-              ],
-            ),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ChatConversationScreen(chat: chat),
+                title: Text(
+                  room.name.isNotEmpty ? room.name : room.id,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
+                subtitle: Text(
+                  room.lastEvent?.body ?? 'No messages yet',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => ActiveChatScreen(room: room)),
+                  );
+                },
               );
             },
           );
@@ -134,28 +260,34 @@ class ChatListScreen extends StatelessWidget {
   }
 }
 
-class ChatConversationScreen extends StatefulWidget {
-  final ChatItem chat;
-  const ChatConversationScreen({super.key, required this.chat});
+class ActiveChatScreen extends StatefulWidget {
+  final Room room;
+  const ActiveChatScreen({super.key, required this.room});
 
   @override
-  State<ChatConversationScreen> createState() => _ChatConversationScreenState();
+  State<ActiveChatScreen> createState() => _ActiveChatScreenState();
 }
 
-class _ChatConversationScreenState extends State<ChatConversationScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final List<String> _messages = [
-    'Connection established via bridge gateway.',
-    'Ready for incoming payloads.'
-  ];
+class _ActiveChatScreenState extends State<ActiveChatScreen> {
+  final _msgController = TextEditingController();
+  late final Future<Timeline> _timelineFuture;
 
-  void _sendMessage() {
-    final text = _controller.text.trim();
+  @override
+  void initState() {
+    super.initState();
+    _timelineFuture = widget.room.getTimeline(
+      onChange: (_) {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  void _send() async {
+    final text = _msgController.text.trim();
     if (text.isNotEmpty) {
-      setState(() {
-        _messages.add(text);
-      });
-      _controller.clear();
+      _msgController.clear();
+      await widget.room.sendTextMessage(text);
+      if (mounted) setState(() {});
     }
   }
 
@@ -166,39 +298,53 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.chat.name, style: const TextStyle(fontSize: 16)),
-            Text(widget.chat.platform, style: const TextStyle(fontSize: 11, color: Colors.tealAccent)),
+            Text(widget.room.name, style: const TextStyle(fontSize: 16)),
+            Text(widget.room.id, style: const TextStyle(fontSize: 10, color: Colors.tealAccent)),
           ],
         ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final isMe = index >= 2;
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _messages[index],
-                      style: TextStyle(
-                        color: isMe
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
+            child: FutureBuilder<Timeline>(
+              future: _timelineFuture,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final timeline = snapshot.data!;
+                final events = timeline.events.where((e) => e.type == EventTypes.Message).toList();
+
+                return ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: events.length,
+                  itemBuilder: (context, index) {
+                    final event = events[index];
+                    final isMe = event.senderId == widget.room.client.userID;
+
+                    return Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          event.body,
+                          style: TextStyle(
+                            color: isMe
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             ),
@@ -210,9 +356,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: _controller,
+                      controller: _msgController,
                       decoration: InputDecoration(
-                        hintText: 'Type a message...',
+                        hintText: 'Type message to Matrix network...',
                         filled: true,
                         fillColor: Colors.white10,
                         border: OutlineInputBorder(
@@ -221,14 +367,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
                     icon: const Icon(Icons.send),
                     color: Theme.of(context).colorScheme.primary,
-                    onPressed: _sendMessage,
+                    onPressed: _send,
                   ),
                 ],
               ),
