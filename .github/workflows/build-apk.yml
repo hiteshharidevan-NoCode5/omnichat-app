@@ -1,0 +1,49 @@
+name: Build Cross-Platform Chat APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Bootstrap Minimal Flutter Project if Empty
+        run: |
+          if [ ! -f "pubspec.yaml" ]; then
+            flutter create --org com.omnichat --project-name omnichat .
+          fi
+
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Rename APK for Consistent Identification
+        run: |
+          mkdir -p output
+          cp build/app/outputs/flutter-apk/app-debug.apk output/OmniChat-universal.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniChat-universal
+          path: output/OmniChat-universal.apk
